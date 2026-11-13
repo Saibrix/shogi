@@ -1,0 +1,65 @@
+// Two browsers play online against each other on the local worker: seek, join, moves, clock, reconnect, resign, rematch.
+// node tools/online_test.mjs   (needs: cd server; npx wrangler dev --port 8788 --local)
+import puppeteer from 'puppeteer-core'
+import { readFileSync } from 'node:fs'
+const URL = process.env.URL || 'http://localhost:8788/'
+const OUT = 'C:/Users/oztur/AppData/Local/Temp/claude/60d8c521320e44a2/8633ac13-4b15-4461-921e-72c799699f7a/scratchpad'
+const exe = ['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', 'C:/Program Files/Microsoft/Edge/Application/msedge.exe'].find((p) => { try { readFileSync(p); return true } catch { return false } })
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+const browser = await puppeteer.launch({ executablePath: exe, headless: true, args: ['--no-sandbox'] })
+const ok = (c, t) => console.log((c ? 'ok   ' : 'FAIL ') + t)
+async function player(name, id) {
+	const ctx = await browser.createBrowserContext()
+	const p = await ctx.newPage()
+	await p.setViewport({ width: 1200, height: 900 })
+	p.on('pageerror', (e) => console.log(name, 'PAGEERROR', e.message))
+	await p.evaluateOnNewDocument((n, i) => { localStorage.setItem('shogi.settings.v1', JSON.stringify({ name: n, looks: { 7: { color: '#ff5a5a', hit: 10 } } })); localStorage.setItem('shogi.device', JSON.stringify(i)) }, name, id)
+	await p.goto(URL + '#/play', { waitUntil: 'load' })
+	return p
+}
+const A = await player('Alice', 'a'.repeat(32))
+const B = await player('Bob', 'b'.repeat(32))
+await sleep(1500)
+const listB = await B.evaluate(() => document.querySelector('.plist')?.textContent)
+ok(listB.includes('Alice') && listB.includes('Bob'), 'both players in the list: ' + listB)
+// Alice makes an open game (she plays Sente), Bob joins
+await A.evaluate(() => window.__shogi.online.send({ t: 'seek', time: { base: 1, inc: 0, byo: 10 }, color: 'sente' }))
+await sleep(600)
+const seeksB = await B.evaluate(() => document.querySelector('.slist')?.textContent)
+ok(seeksB.includes('Alice'), 'Bob sees the open game')
+await B.evaluate(() => [...document.querySelectorAll('.slist button')].find((b) => b.textContent === 'Join').click())
+await sleep(1200)
+ok((await A.evaluate(() => location.hash)).startsWith('#/game/') && (await B.evaluate(() => location.hash)).startsWith('#/game/'), 'both are in the game')
+const move = (p, u) => p.evaluate((u) => { const v = window.__view; v.board.onUserMove(v.game.pos.fromUsi(u)) }, u)
+await move(A, '7g7f'); await sleep(400)
+await move(B, '3c3d'); await sleep(400)
+await move(A, '8h2b+'); await sleep(400)
+const bMoves = await B.evaluate(() => window.__view.game.usi.join(' '))
+ok(bMoves === '7g7f 3c3d 8h2b+', 'Bob got the moves: ' + bMoves)
+await B.screenshot({ path: OUT + '/online_bob.png' })
+// an illegal move is refused
+await B.evaluate(() => window.__shogi.online.send({ t: 'move', gid: location.hash.split('/')[2], usi: '5a5e', ply: 3 }))
+await sleep(300)
+// Bob reloads (reconnect)
+await B.reload({ waitUntil: 'load' })
+await sleep(1500)
+const after = await B.evaluate(() => window.__view?.game.usi.join(' '))
+ok(after === '7g7f 3c3d 8h2b+', 'after reload Bob is back in the game: ' + after)
+const clocks = await A.evaluate(() => [...document.querySelectorAll('.clock')].map((c) => c.textContent))
+ok(clocks.length === 2, 'clocks shown: ' + clocks.join(' / '))
+await move(B, '3a2b'); await sleep(500)
+await A.screenshot({ path: OUT + '/online_alice.png' })
+// Bob resigns
+await B.evaluate(() => window.__shogi.online.send({ t: 'resign', gid: location.hash.split('/')[2] }))
+await sleep(800)
+const st = await A.evaluate(() => document.querySelector('.status')?.textContent)
+ok(/Sente wins \(resignation\)/.test(st), 'result shown: ' + st)
+const bar = await A.evaluate(() => document.querySelector('.pbar .psub')?.textContent + ' ' + [...document.querySelectorAll('.pbar .psub')].map((e) => e.textContent).join('|'))
+ok(/\+/.test(bar), 'ratings changed: ' + bar)
+// rematch
+await A.evaluate(() => window.__shogi.online.send({ t: 'rematch', gid: location.hash.split('/')[2] }))
+await B.evaluate(() => window.__shogi.online.send({ t: 'rematch', gid: location.hash.split('/')[2] }))
+await sleep(1200)
+const youB = await B.evaluate(() => window.__view?.board.orientation)
+ok(youB === 0, 'rematch started, colours swapped (Bob now Sente)')
+await browser.close()

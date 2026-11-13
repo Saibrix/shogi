@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kleines Shogi</title>
+<style>
+:root {
+	--bg: #1b1712; --panel: #2a231b; --text: #f1e6d2; --muted: #b7a88f;
+	--wood: #e3b96f; --wood2: #d6a95c; --line: #6b4a22; --piece: #f6e3b4; --piece2: #e9cf92;
+	--sel: rgba(80, 160, 255, 0.55); --move: rgba(40, 140, 60, 0.55); --last: rgba(255, 210, 60, 0.38); --check: rgba(230, 40, 40, 0.55);
+	--accent: #e0703a;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+body { display: flex; justify-content: center; }
+.app { width: min(100vw, 560px); padding: 12px 16px 24px; display: flex; flex-direction: column; gap: 10px; }
+h1 { font-size: 20px; margin: 4px 0 0; letter-spacing: 0.5px; display: flex; align-items: baseline; gap: 10px; }
+h1 small { color: var(--muted); font-weight: 400; font-size: 13px; }
+.bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+button, select { background: var(--panel); color: var(--text); border: 1px solid #4a3c2c; border-radius: 10px; padding: 8px 12px; font-size: 14px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #1b1712; font-weight: 600; }
+.status { min-height: 22px; font-size: 15px; color: var(--muted); }
+.status b { color: var(--text); }
+.hand { display: flex; gap: 6px; flex-wrap: wrap; min-height: 54px; padding: 6px; background: var(--panel); border-radius: 12px; align-items: center; }
+.hand .label { color: var(--muted); font-size: 12px; margin-right: 4px; writing-mode: horizontal-tb; }
+.hand .hp { position: relative; width: 44px; height: 48px; cursor: pointer; }
+.hand .hp .n { position: absolute; right: -4px; bottom: -4px; background: var(--accent); color: #1b1712; font-size: 11px; font-weight: 700; border-radius: 8px; padding: 0 5px; }
+.hand .hp.sel .pc { outline: 3px solid #4aa0ff; outline-offset: 1px; }
+.board { position: relative; display: grid; grid-template-columns: repeat(9, 1fr); grid-template-rows: repeat(9, 1fr); aspect-ratio: 9 / 9.6; background: linear-gradient(135deg, var(--wood), var(--wood2)); border: 3px solid var(--line); border-radius: 6px; box-shadow: 0 8px 30px rgba(0,0,0,0.45); }
+.sq { position: relative; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.sq:nth-child(9n) { border-right: none; }
+.sq.r8 { border-bottom: none; }
+.sq.last::before, .sq.sel::before, .sq.check::before { content: ""; position: absolute; inset: 0; }
+.sq.last::before { background: var(--last); }
+.sq.sel::before { background: var(--sel); }
+.sq.check::before { background: var(--check); }
+.sq.tgt::after { content: ""; position: absolute; width: 26%; height: 24%; border-radius: 50%; background: var(--move); pointer-events: none; }
+.sq.tgt.cap::after { width: 86%; height: 82%; background: transparent; border: 4px solid var(--move); }
+.dot { position: absolute; width: 7px; height: 7px; background: var(--line); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 1; }
+/* a piece: a pentagon with the point to the front */
+.pc { position: relative; width: 84%; height: 90%; display: flex; align-items: center; justify-content: center; z-index: 2; filter: drop-shadow(0 2px 1.5px rgba(0,0,0,0.35)); transition: transform .12s ease; }
+.pc::before { content: ""; position: absolute; inset: 0; background: linear-gradient(170deg, var(--piece), var(--piece2)); clip-path: polygon(50% 0, 88% 18%, 100% 100%, 0 100%, 12% 18%); }
+.pc span { position: relative; font-family: "Yu Mincho", "Hiragino Mincho ProN", "MS Mincho", "Noto Serif JP", serif; font-weight: 700; font-size: clamp(14px, 5.2vw, 27px); line-height: 1; color: #1d1209; margin-top: 12%; }
+.pc.pro span { color: #c4161c; }
+.pc.gote { transform: rotate(180deg); }
+.pc.small span { font-size: 22px; }
+.sq.tgt .pc, .sq:hover .pc { transform: translateY(-1px); }
+.pc.gote.lift { transform: rotate(180deg) translateY(2px); }
+.files, .ranks { display: flex; color: var(--muted); font-size: 11px; }
+.files { justify-content: space-around; padding: 0 2px; }
+.wrap { position: relative; display: flex; flex-direction: column; gap: 4px; }
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; z-index: 10; }
+.dialog { background: var(--panel); border-radius: 16px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; align-items: center; min-width: 240px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+.dialog .row { display: flex; gap: 14px; }
+.dialog .choice { width: 64px; height: 70px; cursor: pointer; background: none; border: 2px solid transparent; padding: 0; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+.dialog .choice:hover { border-color: var(--accent); }
+.log { font-size: 12px; color: var(--muted); max-height: 70px; overflow: auto; line-height: 1.5; }
+.thinking { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-left: 6px; animation: pulse 0.8s infinite alternate; }
+@keyframes pulse { from { opacity: 0.25; } to { opacity: 1; } }
+.help { font-size: 13px; color: var(--muted); line-height: 1.5; }
+.help summary { cursor: pointer; color: var(--text); }
+</style>
+</head>
+<body>
+<div class="app">
+	<h1>将棋 Shogi <small>klein, für zwei oder gegen den Computer</small></h1>
+	<div class="bar">
+		<button class="primary" id="new">Neues Spiel</button>
+		<select id="mode">
+			<option value="bot">Gegen Computer</option>
+			<option value="two">Zwei Spieler</option>
+		</select>
+		<select id="level">
+			<option value="1">Leicht</option>
+			<option value="2" selected>Mittel</option>
+			<option value="3">Stark</option>
+		</select>
+		<button id="undo">Zurück</button>
+		<button id="flip">Drehen</button>
+	</div>
+	<div class="hand" id="handTop"></div>
+	<div class="wrap">
+		<div class="files" id="files"></div>
+		<div class="board" id="board"></div>
+	</div>
+	<div class="hand" id="handBottom"></div>
+	<div class="status" id="status"></div>
+	<div class="log" id="log"></div>
+	<details class="help">
+		<summary>Regeln in Kürze</summary>
+		<p>Ziel: den gegnerischen König mattsetzen. Geschlagene Figuren wechseln die Seite und landen in deiner Hand. Statt zu ziehen darfst du eine Figur aus der Hand auf ein freies Feld setzen.</p>
+		<p>Erreicht eine Figur die letzten drei Reihen (oder zieht sie aus ihnen heraus), darf sie sich verwandeln (rote Schrift). König und Gold verwandeln sich nie. Bauer, Lanze und Springer müssen sich verwandeln, wenn sie sonst nicht mehr ziehen könnten.</p>
+		<p>Setzen: kein zweiter unverwandelter Bauer in einer Spalte, kein Bauer, der sofort Matt setzt, keine Figur auf ein Feld, von dem sie nie mehr wegkommt.</p>
+		<p>Figuren: 王 König · 飛 Turm (龍 Drache) · 角 Läufer (馬 Pferd) · 金 Gold · 銀 Silber · 桂 Springer · 香 Lanze · 歩 Bauer (と).</p>
+	</details>
+</div>
+<div id="dialogHost"></div>
+<script>
+'use strict'
+// ---- the rules ----
+// board[r][c]: r 0 is the top row (Gote's side), r 8 the bottom (Sente's side). A piece: { t, o, p } with t the kind, o 0 = Sente (moves up), 1 = Gote, p promoted.
+const KINDS = ['R', 'B', 'G', 'S', 'N', 'L', 'P']          // what can be in hand, in this order
+const KANJI = { K: ['王', '玉'], R: '飛', B: '角', G: '金', S: '銀', N: '桂', L: '香', P: '歩' }
+const PRO = { R: '龍', B: '馬', S: '全', N: '圭', L: '杏', P: 'と' }
+const CAN_PROMOTE = { R: 1, B: 1, S: 1, N: 1, L: 1, P: 1 }
+const NAMES = { K: 'König', R: 'Turm', B: 'Läufer', G: 'Gold', S: 'Silber', N: 'Springer', L: 'Lanze', P: 'Bauer' }
+const VALUE = { P: 1, L: 3, N: 4, S: 5, G: 6, B: 8, R: 10, K: 1000 }
+const PVALUE = { P: 7, L: 6, N: 6, S: 6, B: 11, R: 13 }
+const ORTH = [[1, 0], [-1, 0], [0, 1], [0, -1]], DIAG = [[1, 1], [1, -1], [-1, 1], [-1, -1]]
+
+function initial() {
+	const b = Array.from({ length: 9 }, () => Array(9).fill(null))
+	const back = ['L', 'N', 'S', 'G', 'K', 'G', 'S', 'N', 'L']
+	for (let c = 0; c < 9; c++) {
+		b[0][c] = { t: back[c], o: 1, p: false }; b[8][c] = { t: back[c], o: 0, p: false }
+		b[2][c] = { t: 'P', o: 1, p: false }; b[6][c] = { t: 'P', o: 0, p: false }
+	}
+	b[1][1] = { t: 'R', o: 1, p: false }; b[1][7] = { t: 'B', o: 1, p: false }
+	b[7][7] = { t: 'R', o: 0, p: false }; b[7][1] = { t: 'B', o: 0, p: false }
+	return { board: b, hands: [{}, {}], turn: 0 }
+}
+const inside = (r, c) => r >= 0 && r < 9 && c >= 0 && c < 9
+const fwd = (o) => (o === 0 ? -1 : 1)
+const inZone = (o, r) => (o === 0 ? r <= 2 : r >= 6)
+// the steps (one square) and slides (any distance) of a piece
+function moveShape(pc) {
+	const d = fwd(pc.o)
+	const gold = [[d, -1], [d, 0], [d, 1], [0, -1], [0, 1], [-d, 0]]
+	if (pc.p && (pc.t === 'S' || pc.t === 'N' || pc.t === 'L' || pc.t === 'P')) return { steps: gold, slides: [] }
+	switch (pc.t) {
+		case 'K': return { steps: [...ORTH, ...DIAG], slides: [] }
+		case 'G': return { steps: gold, slides: [] }
+		case 'S': return { steps: [[d, -1], [d, 0], [d, 1], [-d, -1], [-d, 1]], slides: [] }
+		case 'N': return { steps: [[2 * d, -1], [2 * d, 1]], slides: [] }
+		case 'L': return { steps: [], slides: [[d, 0]] }
+		case 'P': return { steps: [[d, 0]], slides: [] }
+		case 'R': return pc.p ? { steps: DIAG, slides: ORTH } : { steps: [], slides: ORTH }
+		case 'B': return pc.p ? { steps: ORTH, slides: DIAG } : { steps: [], slides: DIAG }
+	}
+}
+// a piece that could never move again from row r (pawn / lance on the last row, knight on the last two)
+function deadEnd(t, o, r) {
+	const last = o === 0 ? 0 : 8, second = o === 0 ? 1 : 7
+	if ((t === 'P' || t === 'L') && r === last) return true
+	if (t === 'N' && (r === last || r === second)) return true
+	return false
+}
+// all target squares of the piece on (r, c), own pieces excluded (not yet checked for leaving the king in check)
+function targets(b, r, c) {
+	const pc = b[r][c], out = []
+	const { steps, slides } = moveShape(pc)
+	for (const [dr, dc] of steps) { const tr = r + dr, tc = c + dc; if (inside(tr, tc) && (!b[tr][tc] || b[tr][tc].o !== pc.o)) out.push([tr, tc]) }
+	for (const [dr, dc] of slides) {
+		let tr = r + dr, tc = c + dc
+		while (inside(tr, tc)) { if (b[tr][tc]) { if (b[tr][tc].o !== pc.o) out.push([tr, tc]); break } out.push([tr, tc]); tr += dr; tc += dc }
+	}
+	return out
+}
+function attacked(b, r, c, by) {
+	for (let i = 0; i < 9; i++) for (let j = 0; j < 9; j++) {
+		const p = b[i][j]
+		if (!p || p.o !== by) continue
+		for (const [tr, tc] of targets(b, i, j)) if (tr === r && tc === c) return true
+	}
+	return false
+}
+function kingOf(b, o) { for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) { const p = b[r][c]; if (p && p.t === 'K' && p.o === o) return [r, c] } return null }
+function inCheck(s, o) { const k = kingOf(s.board, o); return !!k && attacked(s.board, k[0], k[1], 1 - o) }
+const cloneBoard = (b) => b.map((row) => row.map((p) => (p ? { ...p } : null)))
+const cloneState = (s) => ({ board: cloneBoard(s.board), hands: [{ ...s.hands[0] }, { ...s.hands[1] }], turn: s.turn })
+// a move: { fr, fc, tr, tc, promo } or a drop { drop: kind, tr, tc }
+function apply(s, m) {
+	const n = cloneState(s), b = n.board, o = s.turn
+	if (m.drop) {
+		b[m.tr][m.tc] = { t: m.drop, o, p: false }
+		n.hands[o][m.drop]--; if (!n.hands[o][m.drop]) delete n.hands[o][m.drop]
+	} else {
+		const pc = b[m.fr][m.fc], cap = b[m.tr][m.tc]
+		if (cap) n.hands[o][cap.t] = (n.hands[o][cap.t] || 0) + 1          // a captured piece changes sides, unpromoted
+		b[m.tr][m.tc] = { t: pc.t, o, p: pc.p || !!m.promo }
+		b[m.fr][m.fc] = null
+	}
+	n.turn = 1 - o
+	return n
+}
+// the moves without looking at checks (the bot searches with these; the king can be captured there)
+function pseudoMoves(s) {
+	const b = s.board, o = s.turn, out = []
+	for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
+		const pc = b[r][c]
+		if (!pc || pc.o !== o) continue
+		for (const [tr, tc] of targets(b, r, c)) {
+			const could = CAN_PROMOTE[pc.t] && !pc.p && (inZone(o, r) || inZone(o, tr))
+			const must = could && deadEnd(pc.t, o, tr)
+			if (!must) out.push({ fr: r, fc: c, tr, tc, promo: false })
+			if (could) out.push({ fr: r, fc: c, tr, tc, promo: true })
+		}
+	}
+	const hand = s.hands[o]
+	for (const t of KINDS) {
+		if (!hand[t]) continue
+		let pawnFiles = null
+		if (t === 'P') { pawnFiles = new Set(); for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) { const p = b[r][c]; if (p && p.o === o && p.t === 'P' && !p.p) pawnFiles.add(c) } }
+		for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
+			if (b[r][c] || deadEnd(t, o, r)) continue
+			if (t === 'P' && pawnFiles.has(c)) continue          // two pawns in one file
+			out.push({ drop: t, tr: r, tc: c })
+		}
+	}
+	return out
+}
+function legalMoves(s) {
+	const out = []
+	for (const m of pseudoMoves(s)) {
+		const n = apply(s, m)
+		if (inCheck(n, s.turn)) continue
+		if (m.drop === 'P' && inCheck(n, n.turn) && !hasLegal(n)) continue          // a pawn dropped to give mate is not allowed
+		out.push(m)
+	}
+	return out
+}
+function hasLegal(s) {
+	for (const m of pseudoMoves(s)) { const n = apply(s, m); if (inCheck(n, s.turn)) continue; if (m.drop === 'P' && inCheck(n, n.turn)) { /* only matters for the side giving check */ } return true }
+	return false
+}
+
+// ---- the bot: alpha-beta over pseudo moves, the king can be captured (that ends the line), material and a little more ----
+function evaluate(s) {
+	let v = 0
+	const b = s.board, kings = [kingOf(b, 0), kingOf(b, 1)]
+	for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
+		const p = b[r][c]
+		if (!p) continue
+		let x = p.p ? PVALUE[p.t] : VALUE[p.t]
+		if (p.t === 'P' && !p.p) x += 0.05 * (p.o === 0 ? 6 - r : r - 2)          // pawns going forward
+		if (p.t !== 'K') {
+			const ek = kings[1 - p.o], ok = kings[p.o]
+			if (ek) { const d = Math.max(Math.abs(ek[0] - r), Math.abs(ek[1] - c)); x += (p.t === 'R' || p.t === 'B' ? 0.012 : 0.035) * (8 - d) }          // pressure on the enemy king
+			if (ok && (p.t === 'G' || p.t === 'S')) { const d = Math.max(Math.abs(ok[0] - r), Math.abs(ok[1] - c)); if (d <= 1) x += 0.35; else if (d === 2) x += 0.15 }          // guards around the own king
+		} else if ((p.o === 0 && r >= 7) || (p.o === 1 && r <= 1)) x += 0.3          // a king that stays at home
+		v += p.o === 0 ? x : -x
+	}
+	for (let o = 0; o < 2; o++) for (const t in s.hands[o]) v += (o === 0 ? 1 : -1) * VALUE[t] * 1.15 * s.hands[o][t]
+	return s.turn === 0 ? v : -v
+}
+function order(s, ms) {
+	const b = s.board
+	return ms.map((m) => {
+		let k = 0
+		if (!m.drop && b[m.tr][m.tc]) { const cp = b[m.tr][m.tc]; k = 10 * (cp.p ? PVALUE[cp.t] : VALUE[cp.t]) - VALUE[b[m.fr][m.fc].t] }
+		if (m.promo) k += 5
+		if (m.drop) k -= 2
+		return [k, m]
+	}).sort((a, b2) => b2[0] - a[0]).map((x) => x[1])
+}
+let nodes = 0
+// only the captures, until it is quiet (exchanges are counted to the end, so the bot does not grab a piece that is taken back)
+function captures(s) {
+	const b = s.board, o = s.turn, out = []
+	for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
+		const pc = b[r][c]
+		if (!pc || pc.o !== o) continue
+		for (const [tr, tc] of targets(b, r, c)) {
+			if (!b[tr][tc]) continue
+			const could = CAN_PROMOTE[pc.t] && !pc.p && (inZone(o, r) || inZone(o, tr))
+			out.push({ fr: r, fc: c, tr, tc, promo: could })
+		}
+	}
+	return out
+}
+function quiet(s, alpha, beta, qd) {
+	nodes++
+	const stand = evaluate(s)
+	if (stand >= beta) return stand
+	if (stand > alpha) alpha = stand
+	if (qd === 0) return alpha
+	for (const m of order(s, captures(s))) {
+		if (s.board[m.tr][m.tc].t === 'K') return 9000
+		const v = -quiet(apply(s, m), -beta, -alpha, qd - 1)
+		if (v >= beta) return v
+		if (v > alpha) alpha = v
+	}
+	return alpha
+}
+function search(s, depth, alpha, beta) {
+	nodes++
+	if (depth === 0) return quiet(s, alpha, beta, 6)
+	let ms = pseudoMoves(s)
+	if (!ms.length) return -5000
+	ms = order(s, ms)
+	if (depth === 1 && ms.length > 60) ms = ms.filter((m) => !m.drop || m.drop !== 'P' || Math.random() < 0.4)          // fewer quiet drops at the leaves
+	for (const m of ms) {
+		if (!m.drop && s.board[m.tr][m.tc] && s.board[m.tr][m.tc].t === 'K') return 9000 + depth          // the king can be taken: the line before was a mistake
+		const v = -search(apply(s, m), depth - 1, -beta, -alpha)
+		if (v >= beta) return v
+		if (v > alpha) alpha = v
+	}
+	return alpha
+}
+function botMove(s, level) {
+	const legal = legalMoves(s)
+	if (!legal.length) return null
+	const depth = level >= 3 ? 3 : level === 2 ? 2 : 1
+	nodes = 0
+	// The search window only proves "not better than the best so far" for the other moves: what comes back then is a bound, not a value.
+	// So the window is opened a little below the best value (by the most the bonus and the chance can add), and moves below it are dropped.
+	const noise = level === 1 ? 0.8 : 0.12, slack = noise + 0.3
+	let best = null, bestScore = -Infinity, bestRaw = -Infinity
+	for (const m of order(s, legal)) {
+		const n = apply(s, m), lo = bestRaw === -Infinity ? -Infinity : bestRaw - slack
+		const raw = -search(n, depth - 1, -Infinity, -lo)
+		if (raw <= lo) continue          // certainly not better
+		let sc = raw
+		if (inCheck(n, n.turn)) { if (!hasLegal(n)) sc = 100000; else sc += 0.25 }          // mate, or at least check
+		sc += Math.random() * noise          // a little variety between moves that are about as good
+		if (sc > bestScore) { bestScore = sc; best = m }
+		if (raw > bestRaw) bestRaw = raw
+	}
+	return best ?? legal[0]
+}
+
+// ---- the page ----
+const $ = (id) => document.getElementById(id)
+const boardEl = $('board'), statusEl = $('status'), logEl = $('log')
+let state = initial(), history = [], sel = null, flipped = false, lastMove = null, over = false, thinking = false, log = []
+const mode = () => $('mode').value, level = () => Number($('level').value)
+const fileName = (c) => 9 - c, rankName = (r) => '一二三四五六七八九'[r]
+function pieceEl(p, small = false) {
+	const d = document.createElement('div')
+	const viewGote = flipped ? p.o === 0 : p.o === 1
+	d.className = 'pc' + (p.p ? ' pro' : '') + (viewGote ? ' gote' : '') + (small ? ' small' : '')
+	const s = document.createElement('span')
+	s.textContent = p.t === 'K' ? KANJI.K[p.o] : p.p ? PRO[p.t] : KANJI[p.t]
+	d.append(s)
+	return d
+}
+function moveText(s, m) {
+	const who = s.turn === 0 ? '☗' : '☖'
+	if (m.drop) return `${who}${fileName(m.tc)}${rankName(m.tr)}${KANJI[m.drop]}打`
+	const p = s.board[m.fr][m.fc], name = p.t === 'K' ? KANJI.K[p.o] : p.p ? PRO[p.t] : KANJI[p.t]
+	return `${who}${fileName(m.tc)}${rankName(m.tr)}${name}${m.promo ? '成' : ''}`
+}
+function render() {
+	boardEl.innerHTML = ''
+	const legal = over ? [] : currentTargets()
+	const ck = !over && inCheck(state, state.turn) ? kingOf(state.board, state.turn) : null
+	for (let vr = 0; vr < 9; vr++) for (let vc = 0; vc < 9; vc++) {
+		const r = flipped ? 8 - vr : vr, c = flipped ? 8 - vc : vc
+		const sq = document.createElement('div')
+		sq.className = 'sq' + (vr === 8 ? ' r8' : '')
+		if (lastMove && lastMove.tr === r && lastMove.tc === c) sq.classList.add('last')
+		if (sel && !sel.drop && sel.r === r && sel.c === c) sq.classList.add('sel')
+		if (ck && ck[0] === r && ck[1] === c) sq.classList.add('check')
+		if (legal.some((t) => t[0] === r && t[1] === c)) { sq.classList.add('tgt'); if (state.board[r][c]) sq.classList.add('cap') }
+		const p = state.board[r][c]
+		if (p) sq.append(pieceEl(p))
+		sq.addEventListener('click', () => clickSquare(r, c))
+		boardEl.append(sq)
+	}
+	// the star points
+	for (const [a, b2] of [[3, 3], [3, 6], [6, 3], [6, 6]]) { const d = document.createElement('div'); d.className = 'dot'; d.style.left = (b2 / 9 * 100) + '%'; d.style.top = (a / 9 * 100) + '%'; boardEl.append(d) }
+	$('files').innerHTML = Array.from({ length: 9 }, (_, i) => `<span>${flipped ? i + 1 : 9 - i}</span>`).join('')
+	renderHand($('handBottom'), flipped ? 1 : 0)
+	renderHand($('handTop'), flipped ? 0 : 1)
+	logEl.textContent = log.join('  ')
+	logEl.scrollTop = logEl.scrollHeight
+	renderStatus()
+}
+function renderHand(el, o) {
+	el.innerHTML = `<span class="label">${o === 0 ? '☗ Sente' : '☖ Gote'}${state.turn === o && !over ? ' ●' : ''}</span>`
+	for (const t of KINDS) {
+		const n = state.hands[o][t]
+		if (!n) continue
+		const w = document.createElement('div')
+		w.className = 'hp' + (sel && sel.drop === t && state.turn === o ? ' sel' : '')
+		w.append(pieceEl({ t, o, p: false }, true))
+		if (n > 1) { const k = document.createElement('div'); k.className = 'n'; k.textContent = n; w.append(k) }
+		w.addEventListener('click', () => clickHand(o, t))
+		el.append(w)
+	}
+}
+function renderStatus() {
+	const side = state.turn === 0 ? 'Sente ☗' : 'Gote ☖'
+	if (over) { statusEl.innerHTML = over; return }
+	let t = `<b>${side}</b> ist am Zug`
+	if (inCheck(state, state.turn)) t += ' – <b style="color:#ff6a5a">Schach!</b>'
+	if (thinking) t += ' <span class="thinking"></span>'
+	statusEl.innerHTML = t
+}
+function currentTargets() {
+	if (!sel) return []
+	const ms = legalMoves(state)
+	return ms.filter((m) => (sel.drop ? m.drop === sel.drop : !m.drop && m.fr === sel.r && m.fc === sel.c)).map((m) => [m.tr, m.tc])
+}
+const humanTurn = () => !over && !thinking && (mode() === 'two' || state.turn === 0)
+function clickHand(o, t) {
+	if (!humanTurn() || o !== state.turn) return
+	sel = sel && sel.drop === t ? null : { drop: t }
+	render()
+}
+function clickSquare(r, c) {
+	if (!humanTurn()) return
+	const p = state.board[r][c]
+	if (sel) {
+		const ms = legalMoves(state).filter((m) => m.tr === r && m.tc === c && (sel.drop ? m.drop === sel.drop : !m.drop && m.fr === sel.r && m.fc === sel.c))
+		if (ms.length === 1) { play(ms[0]); return }
+		if (ms.length === 2) { askPromote(ms, state.board[sel.r][sel.c]); return }
+	}
+	if (p && p.o === state.turn) sel = sel && !sel.drop && sel.r === r && sel.c === c ? null : { r, c }
+	else sel = null
+	render()
+}
+function askPromote(ms, pc) {
+	const host = $('dialogHost')
+	host.innerHTML = ''
+	const ov = document.createElement('div'); ov.className = 'overlay'
+	const dl = document.createElement('div'); dl.className = 'dialog'
+	dl.innerHTML = '<div>Verwandeln?</div>'
+	const row = document.createElement('div'); row.className = 'row'
+	for (const promo of [true, false]) {
+		const b = document.createElement('button'); b.className = 'choice'
+		b.append(pieceEl({ t: pc.t, o: 0, p: promo }))
+		b.title = promo ? 'verwandeln' : 'nicht verwandeln'
+		b.addEventListener('click', () => { host.innerHTML = ''; play(ms.find((m) => !!m.promo === promo)) })
+		row.append(b)
+	}
+	dl.append(row)
+	ov.append(dl)
+	ov.addEventListener('click', (e) => { if (e.target === ov) { host.innerHTML = ''; sel = null; render() } })
+	host.append(ov)
+}
+function play(m) {
+	log.push(moveText(state, m))
+	history.push({ state, lastMove, log: log.length - 1 })
+	state = apply(state, m)
+	lastMove = m; sel = null
+	checkEnd()
+	render()
+	if (!over && mode() === 'bot' && state.turn === 1) botTurn()
+}
+function checkEnd() {
+	if (!hasLegal(state)) {
+		const winner = state.turn === 0 ? 'Gote ☖' : 'Sente ☗'
+		over = inCheck(state, state.turn) ? `<b>Schachmatt!</b> ${winner} gewinnt.` : `<b>Keine Züge mehr.</b> ${winner} gewinnt.`
+	}
+}
+function botTurn() {
+	thinking = true; render()
+	setTimeout(() => {
+		const t0 = performance.now()
+		const m = botMove(state, level())
+		thinking = false
+		if (m) play(m); else { checkEnd(); render() }
+		console.log('bot', nodes, 'nodes', Math.round(performance.now() - t0), 'ms')
+	}, 60)
+}
+$('new').addEventListener('click', () => { state = initial(); history = []; sel = null; lastMove = null; over = false; log = []; render() })
+$('undo').addEventListener('click', () => {
+	if (thinking || !history.length) return
+	let steps = mode() === 'bot' && history.length >= 2 && state.turn === 0 ? 2 : 1          // against the bot: take back its answer too
+	while (steps-- && history.length) { const h = history.pop(); state = h.state; lastMove = h.lastMove; log = log.slice(0, h.log) }
+	over = false; sel = null; render()
+})
+$('flip').addEventListener('click', () => { flipped = !flipped; render() })
+$('mode').addEventListener('change', () => { if (mode() === 'bot' && state.turn === 1 && !over) botTurn() })
+window.__shogi = { get state() { return state }, legalMoves, apply, inCheck, botMove, play }
+render()
+</script>
+</body>
+</html>

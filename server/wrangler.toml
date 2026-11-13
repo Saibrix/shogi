@@ -1,0 +1,17 @@
+name = "shogi"
+main = "src/index.ts"
+compatibility_date = "2025-09-01"
+
+# The page is a set of static files in ../dist; only /ws (online play) goes through the Worker.
+[assets]
+directory = "../dist"
+binding = "ASSETS"
+run_worker_first = ["/ws", "/health"]
+
+[[durable_objects.bindings]]
+name = "LOBBY"
+class_name = "Lobby"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Lobby"]

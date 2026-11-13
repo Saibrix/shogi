@@ -1,0 +1,22 @@
+{
+  "name": "shogi",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "puppeteer-core": "^25.17.0",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "@mizarjp/yaneuraou.halfkp": "^7.6.3-alpha.0",
+    "@mizarjp/yaneuraou.k-p": "^7.6.3-alpha.0"
+  }
+}
