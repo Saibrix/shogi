@@ -3,7 +3,7 @@ import { Game, Position, mTo, mFrom, mDrop } from './rules'
 import { Solver } from './tsume'
 import { GameView } from './gameview'
 import { h, clear, toast } from './ui'
-import { settings, store, keep } from './settings'
+import { settings, store, keep, myLooks } from './settings'
 import { playSound } from './sfx'
 
 type Puzzle = [string, string[], number]
@@ -69,7 +69,7 @@ export function puzzleScreen(root: HTMLElement): () => void {
 		const g = new Game(sfen)
 		if (!view) {
 			view = new GameView(g)
-			view.board.looks = [settings.looks, null]
+			view.board.looks = [myLooks(), null]
 			view.board.effects = settings.effects
 			view.board.onUserMove = (m) => userMove(m)
 			view.barOf(0).name.textContent = 'You (attack)'

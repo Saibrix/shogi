@@ -3,8 +3,8 @@ import './style.css'
 import { Game, Position, START_SFEN, K, R, B, G, S, N, L, P, NAME, base, mTo } from './rules'
 import { GameView, resultText } from './gameview'
 import { ShogiBoard, HIT, HIT_NAMES } from './board'
-import { h, clear, toast, modal } from './ui'
-import { settings, saveSettings, PIECE_SETS, BOARDS, KINDS, store, keep, Looks, EffectsMode } from './settings'
+import { h, clear, toast, modal, refreshTheme } from './ui'
+import { settings, saveSettings, PIECE_SETS, BOARDS, KINDS, store, keep, Looks, EffectsMode, myLooks, Settings } from './settings'
 import { online } from './online'
 import { botMove, LEVELS } from './bot'
 import { Analyzer, gameFromText, fmtEval } from './analysis'
@@ -18,7 +18,7 @@ let cleanup: (() => void) | null = null
 
 // ---- header ----
 const nav = h('nav', { class: 'top' },
-	h('a', { href: '#/', class: 'logo' }, h('span', { class: 'logomark' }, '将'), 'Shogi'),
+	h('a', { href: '#/', class: 'logo' }, h('span', { class: 'logomark' }, '将'), h('span', { class: 'logotext' }, 'Shogi')),
 	h('div', { class: 'links' },
 		h('a', { href: '#/play' }, 'Play'),
 		h('a', { href: '#/bot' }, 'Computer'),
@@ -26,16 +26,29 @@ const nav = h('nav', { class: 'top' },
 		h('a', { href: '#/analysis' }, 'Analysis'),
 		h('a', { href: '#/looks' }, 'Pieces'),
 		h('a', { href: '#/settings', title: 'Settings' }, '⚙')),
+	h('button', { class: 'themebtn', title: 'Light / dark', onClick: () => { settings.theme = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'; saveSettings(); applyTheme(); if (location.hash.startsWith('#/settings')) route() } }, '◐'),
 	h('span', { class: 'netdot', title: 'online' }))
 document.body.prepend(nav)
 online.on('status', () => updateNet())
 online.on('welcome', () => updateNet())
 function updateNet(): void { nav.querySelector('.netdot')!.classList.toggle('on', online.connected) }
 
+// ---- light / dark ----
+const darkQuery = window.matchMedia?.('(prefers-color-scheme: dark)')
+function applyTheme(): void {
+	const t = settings.theme === 'system' ? (darkQuery?.matches === false ? 'light' : 'dark') : settings.theme
+	document.documentElement.dataset.theme = t
+	document.querySelector('meta[name=theme-color]')?.setAttribute('content', t === 'light' ? '#f2efe9' : '#161512')
+	refreshTheme()
+	for (const v of [(window as any).__view]) v?.board?.redraw()
+}
+darkQuery?.addEventListener?.('change', () => { if (settings.theme === 'system') applyTheme() })
+applyTheme()
+
 // ---- looks seen in a game (the setting "effects") ----
 function looksFor(mySide: number, oppLooks: Looks | null): [Looks | null, Looks | null] {
 	const out: [Looks | null, Looks | null] = [null, null]
-	out[mySide] = settings.looks
+	out[mySide] = myLooks()
 	out[1 - mySide] = settings.effects === 'all' ? oppLooks : null
 	return out
 }
@@ -76,7 +89,7 @@ function home(root: HTMLElement): () => void {
 		h('section', { class: 'hero' }, h('h1', {}, 'Shogi'), h('p', { class: 'muted' }, 'Japanese chess, with your own piece colours and capture effects.')),
 		h('div', { class: 'tiles' },
 			tile('#/play', '⚔', 'Play online', 'Challenge someone from the list, with a clock.'),
-			tile('#/bot', '🤖', 'Play the computer', '8 levels, YaneuraOu engine.'),
+			tile('#/bot', '🤖', 'Play the computer', '10 levels like lishogi, YaneuraOu engine.'),
 			tile('#/puzzles', '🧩', 'Tsume puzzles', 'Mate in 1 to 7, with a rating.'),
 			tile('#/analysis', '📈', 'Analysis board', 'Engine, evaluation graph, your games.'),
 			tile('#/looks', '🎨', 'Your pieces', 'A colour and a capture effect for every piece.'),
@@ -280,7 +293,7 @@ function onlineGame(root: HTMLElement, gid: string): () => void {
 
 // ---- against the computer ----
 function botScreen(root: HTMLElement): () => void {
-	let level = store<number>('botLevel', 3), color = store<string>('botColor', 'sente')
+	let level = Math.min(10, store<number>('botLevel', 3)), color = store<string>('botColor', 'sente')
 	let view: GameView | null = null, alive = true, mySide = 0, thinking = false
 	const start = () => {
 		mySide = color === 'random' ? (Math.random() < 0.5 ? 0 : 1) : color === 'gote' ? 1 : 0
@@ -291,11 +304,11 @@ function botScreen(root: HTMLElement): () => void {
 			clear(root).append(view.el)
 		} else view.reset(g)
 		view.setOrientation(mySide)
-		view.board.looks = [null, null]; view.board.looks[mySide] = settings.looks
+		view.board.looks = [null, null]; view.board.looks[mySide] = myLooks()
 		view.board.effects = settings.effects
 		view.barOf(mySide).name.textContent = (mySide ? '☖ ' : '☗ ') + (settings.name || 'You')
 		view.barOf(1 - mySide).name.textContent = (mySide ? '☗ ' : '☖ ') + `Computer · ${LEVELS[level - 1].name}`
-		view.barOf(1 - mySide).sub.textContent = ` ~${LEVELS[level - 1].elo}`
+		view.barOf(1 - mySide).sub.textContent = ''
 		view.barOf(mySide).sub.textContent = ''
 		view.setClock(0, null, false); view.setClock(1, null, false)
 		clear(view.buttons).append(
@@ -355,7 +368,7 @@ function analysisScreen(root: HTMLElement, arg: string): () => void {
 	}
 	const view = new GameView(g)
 	const an = new Analyzer(view)
-	view.board.looks = [settings.looks, settings.looks]
+	view.board.looks = [myLooks(), myLooks()]
 	view.board.effects = settings.effects
 	view.setClock(0, null, false); view.setClock(1, null, false)
 	view.barOf(0).name.textContent = '☗ Sente'; view.barOf(1).name.textContent = '☖ Gote'
@@ -423,7 +436,7 @@ const PALETTE = [null, '#ff5a5a', '#ff9a3c', '#ffd24a', '#7ddc6f', '#3ec7b5', '#
 function looksScreen(root: HTMLElement): () => void {
 	const preview = new ShogiBoard()
 	preview.el.classList.add('previewboard')
-	preview.looks = [settings.looks, null]
+	preview.looks = [myLooks(), null]
 	preview.effects = 'all'
 	preview.setCoords(false)
 	let demoTimer = 0
@@ -457,9 +470,9 @@ function looksScreen(root: HTMLElement): () => void {
 			const img = h('canvas', { class: 'lookimg', width: 96, height: 96 }) as HTMLCanvasElement
 			const drawImg = () => { const c = img.getContext('2d')!; c.clearRect(0, 0, 96, 96); preview.drawPc(c, k, 48, 48, 54, 1) }
 			drawImg()
-			const sw = h('div', { class: 'swatches' }, ...PALETTE.map((c) => h('button', { class: 'sw' + (look.color === c ? ' on' : ''), title: c ?? 'none', style: { background: c ?? 'transparent' }, onClick: () => { look.color = c; saveSettings(); clearSprites(); online.send({ t: 'looks', looks: settings.looks }); render(); demo(k) } }, c ? '' : '∅')))
-			const custom = h('input', { type: 'color', value: look.color ?? '#ffffff', title: 'Any colour', onChange: (e: Event) => { look.color = (e.target as HTMLInputElement).value; saveSettings(); clearSprites(); online.send({ t: 'looks', looks: settings.looks }); render(); demo(k) } })
-			const sel = h('select', { onChange: (e: Event) => { look.hit = Number((e.target as HTMLSelectElement).value); saveSettings(); online.send({ t: 'looks', looks: settings.looks }); demo(k) } },
+			const sw = h('div', { class: 'swatches' }, ...PALETTE.map((c) => h('button', { class: 'sw' + (look.color === c ? ' on' : ''), title: c ?? 'none', style: { background: c ?? 'transparent' }, onClick: () => { look.color = c; saveSettings(); clearSprites(); online.send({ t: 'looks', looks: myLooks() }); render(); demo(k) } }, c ? '' : '∅')))
+			const custom = h('input', { type: 'color', value: look.color ?? '#ffffff', title: 'Any colour', onChange: (e: Event) => { look.color = (e.target as HTMLInputElement).value; saveSettings(); clearSprites(); online.send({ t: 'looks', looks: myLooks() }); render(); demo(k) } })
+			const sel = h('select', { onChange: (e: Event) => { look.hit = Number((e.target as HTMLSelectElement).value); saveSettings(); online.send({ t: 'looks', looks: myLooks() }); demo(k) } },
 				...HIT_NAMES.map((n, i) => h('option', { value: i, selected: look.hit === i }, n)), h('option', { value: -1, selected: look.hit === -1 }, 'Random'))
 			rows.append(h('div', { class: 'lookrow' }, img, h('div', { class: 'lookctl' }, h('b', {}, NAME[k] + (k !== K && k !== G ? ' (and promoted)' : '')), h('div', { class: 'row' }, sw, custom), h('div', { class: 'row' }, 'Capture effect ', sel, h('button', { class: 'small', onClick: () => demo(k) }, '▶ Preview')))))
 		}
@@ -467,9 +480,13 @@ function looksScreen(root: HTMLElement): () => void {
 	}
 	render()
 	onPiecesLoaded(() => render())
-	const reset = h('button', { onClick: () => { if (!confirm('Reset all piece looks?')) return; for (const k of KINDS) settings.looks[k] = { color: null, hit: 0 }; saveSettings(); clearSprites(); online.send({ t: 'looks', looks: settings.looks }); render() } }, 'Reset all')
+	const rnd = h('input', { type: 'checkbox' }) as HTMLInputElement
+	rnd.checked = settings.randomHits
+	rnd.addEventListener('change', () => { settings.randomHits = rnd.checked; saveSettings(); preview.looks = [myLooks(), null]; online.send({ t: 'looks', looks: myLooks() }); demo(R) })
+	const rndRow = h('label', { class: 'setrow randomrow' }, h('span', {}, h('b', {}, 'Random effect at every capture'), h('div', { class: 'muted small' }, 'Every capture picks one of the 16 effects by chance (for all your pieces).')), rnd)
+	const reset = h('button', { onClick: () => { if (!confirm('Reset all piece looks?')) return; for (const k of KINDS) settings.looks[k] = { color: null, hit: 0 }; saveSettings(); clearSprites(); online.send({ t: 'looks', looks: myLooks() }); render() } }, 'Reset all')
 	root.append(h('div', { class: 'lookspage' },
-		h('section', { class: 'card' }, h('h2', {}, 'Your pieces'), h('p', { class: 'muted' }, 'Give every kind of piece its own colour and capture effect. Your opponent sees them too (unless they turned it off in the settings).'), rows, reset),
+		h('section', { class: 'card' }, h('h2', {}, 'Your pieces'), h('p', { class: 'muted' }, 'Give every kind of piece its own colour and capture effect. Your opponent sees them too (unless they turned it off in the settings).'), rndRow, rows, reset),
 		h('section', { class: 'card sticky' }, h('h3', {}, 'Preview'), preview.el)))
 	demo(R)
 	return () => clearTimeout(demoTimer)
@@ -487,6 +504,7 @@ function settingsScreen(root: HTMLElement): void {
 	root.append(h('section', { class: 'card settings' }, h('h2', {}, 'Settings'),
 		h('label', { class: 'setrow' }, h('span', {}, 'Your name'), nameIn),
 		h('div', { class: 'setrow col' }, h('span', {}, 'Piece set'), sets),
+		sel('Theme', [['dark', 'Dark'], ['light', 'Light'], ['system', 'Like my device']], settings.theme, (v) => { settings.theme = v as Settings['theme']; applyTheme() }),
 		sel('Board', BOARDS.map((b) => [b.id, b.name]), settings.board, (v) => (settings.board = v)),
 		sel('Capture effects', [['all', 'All (mine and my opponent\'s)'], ['mine', 'Only my own'], ['simple', 'Simple (a short flash)'], ['off', 'Off']], settings.effects, (v) => (settings.effects = v as EffectsMode)),
 		chk('Sound', settings.sound, (v) => (settings.sound = v)),

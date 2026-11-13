@@ -4,7 +4,7 @@ import { Position, mFrom, mTo, mDrop, mPromo, mv, dropMv, base, PROMOTE, HAND_TY
 import { pieceSprite, onPiecesLoaded } from './pieces'
 import { settings, BOARDS, Looks, EffectsMode } from './settings'
 import { playSound, preloadSounds } from './sfx'
-import { h } from './ui'
+import { h, themeCol } from './ui'
 
 const TAU = Math.PI * 2
 const DRAG_THRESHOLD = 8
@@ -89,7 +89,7 @@ export class ShogiBoard {
 		this.fx.style.cssText = `position:absolute;left:-${FX_PAD}px;top:-${FX_PAD}px;width:calc(100% + ${FX_PAD * 2}px);height:calc(100% + ${FX_PAD * 2}px);pointer-events:none;z-index:3`
 		this.ctx = this.canvas.getContext('2d')!
 		this.fctx = this.fx.getContext('2d')!
-		new ResizeObserver(() => this.resize()).observe(this.el)
+		new ResizeObserver((es) => this.resize(es[0]?.contentRect)).observe(this.el)
 		this.canvas.addEventListener('pointerdown', (e) => this.pdown(e))
 		this.canvas.addEventListener('pointermove', (e) => this.pmove(e))
 		this.canvas.addEventListener('pointerup', (e) => this.pup(e))
@@ -98,13 +98,17 @@ export class ShogiBoard {
 	}
 
 	// ---- geometry ----
-	private resize(): void {
-		const r = this.el.getBoundingClientRect()
-		const w = Math.max(1, Math.round(r.width)), hh = Math.max(1, Math.round(r.height))
-		const dpr = Math.min(window.devicePixelRatio || 1, 3)
+	private lastRect: { width: number; height: number } | null = null
+	private resize(rect?: { width: number; height: number }): void {
+		const r = rect ?? this.lastRect ?? { width: this.el.clientWidth, height: this.el.clientHeight }
+		this.lastRect = r
+		const w = Math.max(1, r.width), hh = Math.max(1, r.height)
+		const want = Math.min(window.devicePixelRatio || 1, 3)
+		const cw = Math.round(w * want)
+		const dpr = cw / w          // canvas pixels match the screen pixels exactly (no scaling blur)
 		if (w === this.w && hh === this.hgt && dpr === this.dpr) return
 		this.w = w; this.hgt = hh; this.dpr = dpr
-		this.canvas.width = Math.round(w * dpr); this.canvas.height = Math.round(hh * dpr)
+		this.canvas.width = cw; this.canvas.height = Math.round(hh * dpr)
 		const cells = (w + FX_PAD * 2) * (hh + FX_PAD * 2)
 		this.fdpr = Math.max(1, Math.min(dpr, 2, Math.sqrt(3e6 / cells)))
 		this.fx.width = Math.round((w + FX_PAD * 2) * this.fdpr); this.fx.height = Math.round((hh + FX_PAD * 2) * this.fdpr)
@@ -240,7 +244,9 @@ export class ShogiBoard {
 			ctx.save(); ctx.globalAlpha *= 0.25; ctx.fillStyle = '#000'
 			ctx.beginPath(); ctx.ellipse(x, y + lift + sz * 0.38, sz * 0.36, sz * 0.12, 0, 0, TAU); ctx.fill(); ctx.restore()
 		}
-		ctx.drawImage(sp, x - sz / 2, y - sz / 2, sz, sz)
+		// exactly the sprite's pixels, on whole device pixels (no blur from scaling)
+		const w = sp.width / this.dpr, d = this.dpr
+		ctx.drawImage(sp, Math.round((x - w / 2) * d) / d, Math.round((y - w / 2) * d) / d, w, w)
 		ctx.restore()
 	}
 
@@ -321,7 +327,7 @@ export class ShogiBoard {
 
 	// ---- frame ----
 	private needsFast(): boolean {
-		return this.sel >= 0 || !!this.anim || this.dragging || this.particles.length > 0 || this.rings.length > 0 || this.bursts.length > 0 || this.flashes.length > 0 || this.shake > 0 || this.victims.length > 0 || this.tileHits.length > 0 || this.kicks.length > 0 || this.freeze > 0 || this.splats.length > 0 || this.zaps.length > 0 || this.slashes.length > 0 || this.dirty
+		return !!this.anim || this.dragging || this.particles.length > 0 || this.rings.length > 0 || this.bursts.length > 0 || this.flashes.length > 0 || this.shake > 0 || this.victims.length > 0 || this.tileHits.length > 0 || this.kicks.length > 0 || this.freeze > 0 || this.splats.length > 0 || this.zaps.length > 0 || this.slashes.length > 0 || this.dirty
 	}
 	private frame(now: number): void {
 		this.raf = 0
@@ -388,7 +394,7 @@ export class ShogiBoard {
 		// hand trays
 		for (const side of [0, 1]) {
 			const y = this.handY[side] + this.off[1]
-			ctx.fillStyle = 'rgba(255,255,255,0.05)'
+			ctx.fillStyle = themeCol.tray
 			ctx.beginPath(); ctx.roundRect(bx, y - s * 0.55, 9 * s, s * 1.1, s * 0.18); ctx.fill()
 			if (this.pos.turn === side && !this.anim) { ctx.strokeStyle = 'rgba(255,207,115,0.35)'; ctx.lineWidth = 1.5; ctx.stroke() }
 		}
@@ -413,7 +419,7 @@ export class ShogiBoard {
 		for (const [px, py] of [[3, 3], [6, 3], [3, 6], [6, 6]]) { ctx.beginPath(); ctx.arc(bx + px * s, by + py * s, s * 0.06, 0, TAU); ctx.fill() }
 		// coordinates
 		if (this.coords) {
-			ctx.fillStyle = 'rgba(230,220,200,0.6)'; ctx.font = `${Math.round(s * 0.26)}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+			ctx.fillStyle = themeCol.coord; ctx.font = `${Math.round(s * 0.26)}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
 			for (let c = 0; c < 9; c++) ctx.fillText(String(this.orientation ? c + 1 : 9 - c), bx + (c + 0.5) * s, by - s * 0.25)
 			for (let r = 0; r < 9; r++) ctx.fillText('abcdefghi'[this.orientation ? 8 - r : r], bx + 9 * s + s * 0.24, by + (r + 0.5) * s)
 		}

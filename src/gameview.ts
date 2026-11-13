@@ -113,8 +113,9 @@ export class GameView {
 		}
 		if (this.game.result) m.append(h('div', { class: 'mresult' }, resultText(this.game.result)))
 		const cur = m.querySelector('.cur') as HTMLElement | null
-		if (cur) cur.scrollIntoView({ block: 'nearest' })
-		else m.scrollTop = this.ply === 0 ? 0 : m.scrollHeight
+		// scroll only inside the list (scrollIntoView would move the whole page on a phone)
+		if (cur) { m.scrollTop = Math.max(0, cur.offsetTop - m.clientHeight / 2); m.scrollLeft = Math.max(0, cur.offsetLeft - m.clientWidth / 2) }
+		else { m.scrollTop = this.ply === 0 ? 0 : m.scrollHeight; m.scrollLeft = this.ply === 0 ? 0 : m.scrollWidth }
 	}
 	setStatus(html: string): void { this.status.innerHTML = html }
 	shownPosition(): Position { return this.game.positionAt(this.ply) }

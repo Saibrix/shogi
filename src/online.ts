@@ -1,5 +1,5 @@
 // The connection to the server (/ws): connects again by itself after a drop, says hello with the device id, name and piece looks.
-import { settings, deviceId } from './settings'
+import { settings, deviceId, myLooks } from './settings'
 
 type Handler = (m: any) => void
 class Online {
@@ -24,7 +24,7 @@ class Online {
 		this.ws = ws
 		ws.onopen = () => {
 			this.retry = 0
-			ws.send(JSON.stringify({ t: 'hello', id: deviceId(), name: settings.name, looks: settings.looks }))
+			ws.send(JSON.stringify({ t: 'hello', id: deviceId(), name: settings.name, looks: myLooks() }))
 			clearInterval(this.ping)
 			this.ping = window.setInterval(() => this.send({ t: 'ping' }), 25000)
 		}

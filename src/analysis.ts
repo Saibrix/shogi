@@ -3,7 +3,7 @@
 import { Game, Position } from './rules'
 import { search, startEngine, engineError, Info, stopSearch } from './engine'
 import { GameView } from './gameview'
-import { h } from './ui'
+import { h, themeCol } from './ui'
 
 // the engine's score from Sente's view
 export const senteCp = (cp: number, turn: number) => (turn === 0 ? cp : -cp)
@@ -92,14 +92,14 @@ export class Analyzer {
 		const x = c.getContext('2d')!
 		x.setTransform(dpr, 0, 0, dpr, 0, 0)
 		const w = r.width, hh = r.height, n = Math.max(1, this.view.game.moves.length)
-		x.fillStyle = '#2a2723'; x.fillRect(0, 0, w, hh)
+		x.fillStyle = themeCol.graphbg; x.fillRect(0, 0, w, hh)
 		const Y = (cp: number) => hh / 2 - winChance(cp) * (hh / 2 - 2)
 		x.beginPath(); x.moveTo(0, hh / 2)
 		let last = hh / 2
 		for (let i = 0; i <= n; i++) { const e = this.evals[i]; if (e == null) continue; last = Y(e); x.lineTo((i / n) * w, last) }
 		x.lineTo(w, last); x.lineTo(w, hh / 2); x.closePath()
-		x.fillStyle = 'rgba(240,226,190,0.85)'; x.fill()
-		x.strokeStyle = 'rgba(255,255,255,0.25)'; x.beginPath(); x.moveTo(0, hh / 2); x.lineTo(w, hh / 2); x.stroke()
+		x.fillStyle = themeCol.graphfill; x.fill()
+		x.strokeStyle = 'rgba(128,128,128,0.4)'; x.beginPath(); x.moveTo(0, hh / 2); x.lineTo(w, hh / 2); x.stroke()
 		for (let i = 1; i <= n; i++) {
 			const note = this.view.notes[i]
 			if (!note) continue

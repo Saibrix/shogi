@@ -2,15 +2,20 @@
 import { Game, Position, VALUE, base, K, mTo, mDrop } from './rules'
 import { search, startEngine } from './engine'
 
-export const LEVELS: { name: string; elo: number; lim: { depth?: number; nodes?: number; movetime?: number }; multipv: number; temp: number }[] = [
-	{ name: 'Level 1', elo: 600, lim: { depth: 1 }, multipv: 10, temp: 420 },
-	{ name: 'Level 2', elo: 900, lim: { depth: 2 }, multipv: 8, temp: 230 },
-	{ name: 'Level 3', elo: 1150, lim: { depth: 3 }, multipv: 6, temp: 130 },
-	{ name: 'Level 4', elo: 1400, lim: { nodes: 4000 }, multipv: 5, temp: 70 },
-	{ name: 'Level 5', elo: 1650, lim: { nodes: 25000 }, multipv: 4, temp: 35 },
-	{ name: 'Level 6', elo: 1900, lim: { nodes: 120000 }, multipv: 3, temp: 14 },
-	{ name: 'Level 7', elo: 2200, lim: { movetime: 1200 }, multipv: 1, temp: 0 },
-	{ name: 'Level 8', elo: 2600, lim: { movetime: 3500 }, multipv: 1, temp: 0 },
+// The 10 levels of lishogi (shoginet's server-config.json): 1-4 there are Fairy-Stockfish with "Skill Level" -9/-5/-1/3 at depth 5,
+// here YaneuraOu at depth 5 that picks among its best moves by chance (the lower the level, the more often a weaker one);
+// 5-10 are YaneuraOu with the same depth and time limits as on lishogi.
+export const LEVELS: { name: string; lim: { depth?: number; nodes?: number; movetime?: number }; multipv: number; temp: number }[] = [
+	{ name: 'Level 1', lim: { depth: 5, movetime: 300 }, multipv: 10, temp: 520 },
+	{ name: 'Level 2', lim: { depth: 5, movetime: 300 }, multipv: 8, temp: 320 },
+	{ name: 'Level 3', lim: { depth: 5, movetime: 300 }, multipv: 6, temp: 180 },
+	{ name: 'Level 4', lim: { depth: 5, movetime: 300 }, multipv: 4, temp: 90 },
+	{ name: 'Level 5', lim: { depth: 2, movetime: 300 }, multipv: 1, temp: 0 },
+	{ name: 'Level 6', lim: { depth: 4, movetime: 400 }, multipv: 1, temp: 0 },
+	{ name: 'Level 7', lim: { depth: 8, movetime: 500 }, multipv: 1, temp: 0 },
+	{ name: 'Level 8', lim: { depth: 13, movetime: 1000 }, multipv: 1, temp: 0 },
+	{ name: 'Level 9', lim: { depth: 17, movetime: 1500 }, multipv: 1, temp: 0 },
+	{ name: 'Level 10', lim: { depth: 22, movetime: 2500 }, multipv: 1, temp: 0 },
 ]
 
 export async function botMove(g: Game, level: number): Promise<number> {
@@ -33,8 +38,8 @@ export async function botMove(g: Game, level: number): Promise<number> {
 		}
 	}
 	if (!move || !legal.includes(move)) move = fallbackMove(g.pos, level)
-	// a short pause, so the bot does not answer in the same instant
-	const wait = 350 - (performance.now() - t0)
+	// at least a second, so a fast bot does not answer in the same instant
+	const wait = 1000 - (performance.now() - t0)
 	if (wait > 0) await new Promise((r) => setTimeout(r, wait))
 	return move
 }

@@ -36,3 +36,11 @@ export function fmtClock(ms: number): string {
 	if (m >= 60) return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}:${String(r).padStart(2, '0')}`
 	return `${m}:${String(r).padStart(2, '0')}`
 }
+
+// colours of the theme that canvases need (read from the CSS variables, again after every theme change)
+export const themeCol = { coord: 'rgba(230,220,200,0.6)', tray: 'rgba(255,255,255,0.05)', graphbg: '#2a2723', graphfill: 'rgba(240,226,190,0.85)' }
+export function refreshTheme(): void {
+	const cs = getComputedStyle(document.documentElement)
+	const g = (n: string, d: string) => cs.getPropertyValue(n).trim() || d
+	themeCol.coord = g('--coord', themeCol.coord); themeCol.tray = g('--tray', themeCol.tray); themeCol.graphbg = g('--graphbg', themeCol.graphbg); themeCol.graphfill = g('--graphfill', themeCol.graphfill)
+}

@@ -29,11 +29,13 @@ export interface Settings {
 	coords: boolean
 	looks: Looks
 	confirmResign: boolean
+	randomHits: boolean          // a random capture effect at every capture, for all pieces
+	theme: 'dark' | 'light' | 'system'
 }
 const DEFAULT_LOOKS = (): Looks => Object.fromEntries(KINDS.map((k) => [k, { color: null, hit: 0 }])) as Looks
 const KEY = 'shogi.settings.v1'
 function load(): Settings {
-	const d: Settings = { name: '', pieceSet: 'ryoko_1kanji', board: 'kaya', sound: true, volume: 0.8, effects: 'all', coords: true, looks: DEFAULT_LOOKS(), confirmResign: true }
+	const d: Settings = { name: '', pieceSet: 'ryoko_1kanji', board: 'kaya', sound: true, volume: 0.8, effects: 'all', coords: true, looks: DEFAULT_LOOKS(), confirmResign: true, randomHits: false, theme: 'dark' }
 	try {
 		const raw = localStorage.getItem(KEY)
 		if (raw) { const s = JSON.parse(raw); Object.assign(d, s); d.looks = { ...DEFAULT_LOOKS(), ...(s.looks ?? {}) } }
@@ -54,4 +56,10 @@ export function deviceId(): string {
 	let id = store<string>('device', '')
 	if (!id) { id = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join(''); keep('device', id) }
 	return id
+}
+
+// the looks as others see them (with 'random at every capture' switched on, every piece kind has the effect Random)
+export function myLooks(): Looks {
+	if (!settings.randomHits) return settings.looks
+	return Object.fromEntries(KINDS.map((k) => [k, { color: settings.looks[k]?.color ?? null, hit: -1 }])) as Looks
 }
