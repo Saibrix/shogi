@@ -14,5 +14,8 @@ Live: https://shogi.saidozturk08.workers.dev
   `node tools/online_test.mjs` (two browsers against `wrangler dev --port 8788 --local`), `node tools/shot.mjs <name> <w> <h> tools/s_*.js` (screenshots).
 - Deploy: `powershell -File deploy.ps1 -Msg "..."` (build, `wrangler deploy`, commit, push).
 
+## Lishogi FX userscript
+Random capture effects on lishogi.org (cosmetic only): userscript/, notes in userscript/NOTES.md, install from /lishogi-fx.user.js.
+
 ## Licence
 GPL v3 (see LICENSE), because the engine is GPL. See CREDITS.md for the piece sets and the engine.
