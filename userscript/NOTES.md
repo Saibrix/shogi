@@ -16,7 +16,7 @@ READ THIS FIRST when the user wants changes to the lishogi script. Everything ne
   `transform: translate(X%, Y%)` (X/100 = column, Y/100 = row on screen). When a move animation ends, the taken piece's element is REMOVED.
   A capture = a removed piece whose square now holds a piece of the other colour (a promotion also removes an element, but the same colour stands there).
   More than 2 removals at once = a jump in the move list: ignored.
-- The transform has a scale: 	ranslate(col*100*f%, row*100*f%) scale(f). With lishogi's "scale down pieces" (common, e.g. desktop) f = 0.5 and the piece element is twice the square: divide by 100*f, not 100 (bug of v0.1.0: effects were far off the piece).
+- The transform has a scale: `translate(col*100*f%, row*100*f%) scale(f)`. With lishogi's "scale down pieces" (common, e.g. desktop) f = 0.5 and the piece element is twice the square: divide by 100*f, not 100 (bug of v0.1.0: effects were far off the piece).
 - The effect canvas gets its size in px from innerWidth/innerHeight, not 100vw/100vh (on phones 100vh is taller than the window and stretched the picture).
 - Lishogi's squares are not square (taller than wide): use the `d-9x9` class of `.sg-wrap` and the sg-pieces rect for width and height separately.
 - Piece pictures: lishogi uses CSS background images (data: URIs; gote pictures are already upside down). The script remembers the computed
