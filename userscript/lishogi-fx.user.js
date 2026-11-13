@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Lishogi FX
 // @namespace    https://shogi.saidozturk08.workers.dev
-// @version      0.1.0
+// @version      0.1.1
 // @description  Random capture effects on lishogi (cosmetic only: no sounds, no hints, never touches the game)
 // @match        https://lishogi.org/*
 // @grant        none
@@ -39,7 +39,7 @@
 	function layer() {
 		if (cv && cv.isConnected) return
 		cv = document.createElement('canvas')
-		cv.style.cssText = 'position:fixed;left:0;top:0;width:100vw;height:100vh;pointer-events:none;z-index:2147483000'
+		cv.style.cssText = 'position:fixed;left:0;top:0;pointer-events:none;z-index:2147483000'
 		document.body.appendChild(cv)
 		ctx = cv.getContext('2d')
 	}
@@ -47,6 +47,8 @@
 		dpr = Math.min(window.devicePixelRatio || 1, 2)
 		const w = Math.round(window.innerWidth * dpr), h = Math.round(window.innerHeight * dpr)
 		if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h }
+		// exactly the visible window (100vh is taller than the window on phones, which stretched the picture)
+		cv.style.width = window.innerWidth + 'px'; cv.style.height = window.innerHeight + 'px'
 	}
 	const glow = new Map()
 	function glowSprite(col) {
@@ -331,8 +333,12 @@
 		const cl = el.classList
 		const color = cl.contains('sente') ? 'sente' : cl.contains('gote') ? 'gote' : ''
 		const role = ROLES.find((r) => cl.contains(r)) || ''
-		const m = /translate\(\s*(-?[\d.]+)%\s*,\s*(-?[\d.]+)%/.exec(el.style.transform || '')
-		return { color, role, col: m ? Math.round(Number(m[1]) / 100) : -1, row: m ? Math.round(Number(m[2]) / 100) : -1 }
+		// translate(col * 100 * f %, row * 100 * f %) scale(f): with "scale down pieces" lishogi draws pieces twice as big and f = 0.5
+		const tr = el.style.transform || ''
+		const m = /translate\(\s*(-?[\d.]+)%\s*,\s*(-?[\d.]+)%/.exec(tr)
+		const sc = /scale\(\s*([\d.]+)/.exec(tr)
+		const f = sc ? Number(sc[1]) || 1 : 1
+		return { color, role, col: m ? Math.round(Number(m[1]) / (100 * f)) : -1, row: m ? Math.round(Number(m[2]) / (100 * f)) : -1 }
 	}
 	const wrapOf = (piecesEl) => piecesEl.closest('.sg-wrap')
 	const orient = (piecesEl) => { const w = wrapOf(piecesEl); return w && w.classList.contains('orientation-gote') ? 'g' : 's' }
