@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Lishogi FX
 // @namespace    https://shogi.saidozturk08.workers.dev
-// @version      0.1.1
+// @version      0.1.2
 // @description  Random capture effects on lishogi (cosmetic only: no sounds, no hints, never touches the game)
 // @match        https://lishogi.org/*
 // @grant        none
@@ -70,7 +70,8 @@
 	function busy() { return parts.length || rings.length || flashes.length || victims.length || bursts.length || splats.length || zaps.length }
 
 	// ---- the effects (from Hex Chaos; only those that leave the moving piece alone) ----
-	const STYLES = ['classic', 'poof', 'flick', 'sink', 'splat', 'pixel', 'vortex', 'balloon', 'frost', 'confetti', 'abduct', 'zap']
+	const LEAD = 0.1          // seconds the effect is brought forward (raise it if it still feels late)
+	const STYLES = ['classic', 'poof', 'flick', 'pixel', 'vortex', 'balloon', 'frost', 'confetti', 'abduct', 'zap']
 	function impact(p, sq, img, victimColor, moverColor, moverRole, dir) {
 		layer(); size()
 		const ts = sq * 0.58, col = SIDE[victimColor] || '#ffcf73', tcol = SIDE[moverColor] || '#ffffff'
@@ -151,6 +152,7 @@
 				bursts.push({ kind, ts, x: p[0], y: p[1], dx, dy, t: 0, life: kind === 'ram' ? 0.6 : kind === 'slice' ? 0.5 : kind === 'strike' ? 0.65 : 0.7, col: tcol, seed: Math.floor(Math.random() * 1e9) })
 			}
 		}
+		advance(LEAD)          // start the effect already a little way in, so it lands on time
 		kick()
 	}
 	function jagged(a, b, jag) {
@@ -164,15 +166,18 @@
 		raf = 0
 		const dt = Math.min(0.05, (now - last) / 1000)
 		last = now
+		advance(dt)
+		draw()
+		if (busy()) raf = requestAnimationFrame(frame)
+		else ctx.clearRect(0, 0, cv.width, cv.height)
+	}
+	function advance(dt) {
 		const step = (arr) => { for (const x of arr) x.t += dt / x.life; for (let i = arr.length - 1; i >= 0; i--) if (arr[i].t >= 1) arr.splice(i, 1) }
 		step(rings); step(flashes); step(bursts); step(splats); step(zaps)
 		for (const p of parts) { p.x += p.vx * dt; p.y += p.vy * dt; const k = Math.pow(p.k === 2 ? 0.25 : 0.04, dt); p.vx *= k; p.vy = (p.vy + p.g * dt) * k; p.rot += p.sp * dt; p.life -= dt }
 		for (let i = parts.length - 1; i >= 0; i--) if (parts[i].life <= 0) parts.splice(i, 1)
 		for (const v of victims) { const ts = v.sq * 0.58; v.t += dt / v.life; v.x += v.vx * dt; v.y += v.vy * dt; v.vz -= ts * 17 * dt; v.z = Math.max(0, v.z + v.vz * dt); v.rot += v.vr * dt; if (v.z === 0 && v.vz < 0) v.vz *= -0.3 }
 		for (let i = victims.length - 1; i >= 0; i--) if (victims[i].t >= 1) victims.splice(i, 1)
-		draw()
-		if (busy()) raf = requestAnimationFrame(frame)
-		else ctx.clearRect(0, 0, cv.width, cv.height)
 	}
 
 	function drawPiece(img, x, y, sz, alpha) {
