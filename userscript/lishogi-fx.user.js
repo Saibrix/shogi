@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         Lishogi FX
-// @namespace    https://shogi.saidozturk08.workers.dev
-// @version      0.1.2
+// @namespace    https://shogi.hexchaos.workers.dev
+// @version      0.1.3
 // @description  Random capture effects on lishogi (cosmetic only: no sounds, no hints, never touches the game)
 // @match        https://lishogi.org/*
 // @grant        none
 // @run-at       document-idle
-// @downloadURL  https://shogi.saidozturk08.workers.dev/lishogi-fx.user.js
-// @updateURL    https://shogi.saidozturk08.workers.dev/lishogi-fx.user.js
+// @downloadURL  https://shogi.hexchaos.workers.dev/lishogi-fx.user.js
+// @updateURL    https://shogi.hexchaos.workers.dev/lishogi-fx.user.js
 // ==/UserScript==
 // Notes for changes: see userscript/NOTES.md in the shogi repo.
 (function () {

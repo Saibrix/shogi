@@ -3,7 +3,7 @@
 A small shogi site: play online with a clock, play the computer (YaneuraOu), solve tsume puzzles with a rating, analyse games.
 Every piece kind can have its own colour and capture effect (taken from the game Hex Chaos).
 
-Live: https://shogi.saidozturk08.workers.dev
+Live: https://shogi.hexchaos.workers.dev
 
 ## How it is built
 - `src/` TypeScript page (no framework), bundled by esbuild (`node build.mjs` -> `dist/`).

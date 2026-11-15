@@ -5,7 +5,7 @@ READ THIS FIRST when the user wants changes to the lishogi script. Everything ne
 ## What it is
 - `lishogi-fx.user.js`: a Violentmonkey/Tampermonkey userscript for lishogi.org. Random capture effects (taken from Hex Chaos, already ported here).
 - Purely cosmetic (user wish, lishogi's rules): no sounds, no piece colours, no hints, no evaluation, never makes or changes moves, sends nothing anywhere.
-- The user tests it on Android: Firefox + Violentmonkey. Install/update link: https://shogi.saidozturk08.workers.dev/lishogi-fx.user.js
+- The user tests it on Android: Firefox + Violentmonkey. Install/update link: https://shogi.hexchaos.workers.dev/lishogi-fx.user.js
   (build.mjs copies the file into dist/; `powershell -File deploy.ps1 ...` uploads it). **Raise `@version` on every change**, otherwise Violentmonkey does not update.
 
 ## How it works
