@@ -16,8 +16,6 @@ writeFileSync('dist/index.html', readFileSync('src/index.html', 'utf8').replace(
 cpSync('src/icon.svg', 'dist/icon.svg')
 cpSync('assets/pieces', 'dist/pieces', { recursive: true })
 cpSync('src/gen/tsume.json', 'dist/tsume.json')
-// the lishogi userscript (install link: /lishogi-fx.user.js, see userscript/NOTES.md)
-cpSync('userscript/lishogi-fx.user.js', 'dist/lishogi-fx.user.js')
 // the engine (YaneuraOu, GPLv3): the files of the npm package as they are
 const eng = 'node_modules/@mizarjp/yaneuraou.k-p/lib/'
 for (const f of ['yaneuraou.k-p.js', 'yaneuraou.k-p.wasm', 'yaneuraou.k-p.worker.js']) cpSync(eng + f, 'dist/engine/' + f)
